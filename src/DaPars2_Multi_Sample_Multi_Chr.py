@@ -159,31 +159,38 @@ def De_Novo_3UTR_Identification_Loading_Target_Wig_for_TCGA_Multiple_Samples_Mul
         Output_result.writelines('\t'.join(first_line) + '\n')
 
         All_events_ids = list(UTR_events_dict.keys())
+        # Assign events to processors (remains the same logic)
+        All_events_ids = list(UTR_events_dict.keys())
         num_threads = Num_threads
         Assigned_events_ids_all_threads = Assign_to_different_processor_balance_events(All_events_ids, num_threads)
-
+        
         num_real_threads = len(Assigned_events_ids_all_threads)
-
+        
+        # Generate output file paths
         Output_each_processor_all = []
         for i in range(num_real_threads):
-            curr_temp_output = temp_dir + 'Each_processor_3UTR_Result_%s.txt' % (str(i+1))
+            curr_temp_output = temp_dir + 'Each_processor_3UTR_Result_%s.txt' % (str(i + 1))
             Output_each_processor_all.append(curr_temp_output)
-
-        processes = []
+        
+        # Serial execution instead of multiprocessing
         for i in range(num_real_threads):
-            process = multiprocessing.Process(target=Each_Thread_3UTR_estimation_list_version_sample_ids, args=(Assigned_events_ids_all_threads[i], UTR_events_dict, All_sample_coverage_weights, num_samples, Output_each_processor_all[i], All_samples_Target_3UTR_coverages, Coverage_threshold))
-       	    process.start()
-            processes.append(process)
-
-        for p in processes:
-            p.join()
-
-    	#Combine results
+            Each_Thread_3UTR_estimation_list_version_sample_ids(
+                Assigned_events_ids_all_threads[i], 
+                UTR_events_dict, 
+                All_sample_coverage_weights, 
+                num_samples, 
+                Output_each_processor_all[i], 
+                All_samples_Target_3UTR_coverages, 
+                Coverage_threshold
+            )
+        
+        # Combine results
         for i in range(num_real_threads):
             curr_result = Output_each_processor_all[i]
-            for line in open(curr_result, 'r'):
-                Output_result.writelines(line)
-    
+            with open(curr_result, 'r') as file:
+                for line in file:
+                    Output_result.writelines(line)
+        
         Output_result.close()
 
 
@@ -331,20 +338,19 @@ def Load_Target_Wig_files_Multiple_threads_shared_dict_sampleid_key(All_Wig_file
             if region_start + 50 < region_end:
                 UTR_events_dict[fields[3]] = [fields[0],region_start,region_end,fields[-1],UTR_pos]
 
-    Assigned_index = Assign_to_different_processor_balance(num_samples, num_threads)
-
-    manager = multiprocessing.Manager() # create only 1 Manager
-    All_samples_extracted_3UTR_coverage_dict = manager.dict() # create only 1 dict
-
-    processes = []
+    All_samples_extracted_3UTR_coverage_dict = {}
+    
+    # Serial execution instead of multiprocessing
     Final_assigned_threads_num = len(Assigned_index)
     for i in range(Final_assigned_threads_num):
-        process = multiprocessing.Process(target=load_wig_funct_shared_dict_sampleid_key, args=(All_Wig_files, Assigned_index[i], UTR_events_dict,curr_processing_chr,All_samples_extracted_3UTR_coverage_dict))
-        process.start()
-        processes.append(process)
-
-    for p in processes:
-        p.join()
+        # Call the function directly in the loop
+        load_wig_funct_shared_dict_sampleid_key(
+            All_Wig_files, 
+            Assigned_index[i], 
+            UTR_events_dict, 
+            curr_processing_chr, 
+            All_samples_extracted_3UTR_coverage_dict
+        )
 
     return All_samples_extracted_3UTR_coverage_dict, UTR_events_dict
 
